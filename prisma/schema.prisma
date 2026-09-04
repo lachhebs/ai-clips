@@ -1,0 +1,338 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum SceneType {
+  DIALOGUE
+  ACTION
+  TRANSITION
+  INTRO
+  OUTRO
+}
+
+enum ClipStatus {
+  CANDIDATE
+  APPROVED
+  REJECTED
+  RENDERING
+  COMPLETED
+}
+
+enum JobType {
+  UPLOAD
+  PROBE
+  TRANSCRIBE
+  SCENE_DETECT
+  AI_ANALYSIS
+  CLIP_DISCOVERY
+  CLIP_SCORING
+  REFRAME
+  CAPTIONS
+  RENDER
+  THUMBNAIL
+}
+
+enum JobStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+enum AIProviderType {
+  QWEN
+  GEMINI
+  GLM
+  LOCAL
+  OPENAI
+}
+
+enum AspectRatio {
+  LANDSCAPE
+  PORTRAIT
+  SQUARE
+}
+
+enum VideoStyle {
+  TIKTOK
+  INSTAGRAM
+  YOUTUBE_SHORTS
+}
+
+enum CaptionPosition {
+  TOP
+  CENTER
+  BOTTOM
+}
+
+enum CaptionBackground {
+  NONE
+  TRANSPARENT
+  SOLID
+}
+
+enum CaptionAnimation {
+  NONE
+  FADE
+  SLIDE
+  KARAOKE
+}
+
+enum Capitalization {
+  NONE
+  UPPER
+  LOWER
+  TITLE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects         Project[]
+  aiProviders      AIProvider[]
+  captionPresets   CaptionPreset[]
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  userId       String
+  name         String
+  description  String?
+  status       ProjectStatus @default(UPLOADING)
+  videoPath    String?
+  videoUrl     String?
+  duration     Float?
+  resolution   String?
+  fps          Float?
+  fileSize     BigInt?
+  thumbnailUrl String?
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id])
+  transcript     Transcript?
+  scenes         Scene[]
+  clips          Clip[]
+  jobs           Job[]
+  settings       ProjectSettings?
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Transcript {
+  id        String   @id @default(uuid())
+  projectId String   @unique
+  language  String?
+  fullText  String?
+  createdAt DateTime @default(now())
+
+  project  Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  segments TranscriptSegment[]
+
+  @@index([projectId])
+}
+
+model TranscriptSegment {
+  id           String   @id @default(uuid())
+  transcriptId String
+  text         String
+  start        Float
+  end          Float
+  speaker      String?
+  confidence   Float?
+
+  transcript Transcript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptId])
+  @@index([start])
+}
+
+model Scene {
+  id           String    @id @default(uuid())
+  projectId    String
+  startTime    Float
+  endTime      Float
+  thumbnailUrl String?
+  description  String?
+  type         SceneType @default(DIALOGUE)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([startTime])
+}
+
+model Clip {
+  id           String     @id @default(uuid())
+  projectId    String
+  startTime    Float
+  endTime      Float
+  duration     Float
+  title        String
+  hook         String?
+  description  String?
+  transcript   String?
+  reasoning    String?
+  status       ClipStatus @default(CANDIDATE)
+  outputPath   String?
+  thumbnailUrl String?
+  aspectRatio  AspectRatio @default(PORTRAIT)
+  metadata     Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  score      ClipScore?
+  renderJob  RenderJob?
+
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ClipScore {
+  id         String  @id @default(uuid())
+  clipId     String  @unique
+  hook       Float
+  value      Float
+  emotion    Float
+  surprise   Float
+  story      Float
+  standalone Float
+  clarity    Float
+  visual     Float
+  virality   Float
+  overall    Float
+  weights    Json?
+  providerId String?
+
+  clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
+  @@index([clipId])
+  @@index([overall])
+}
+
+model Job {
+  id          String    @id @default(uuid())
+  projectId   String
+  type        JobType
+  status      JobStatus @default(PENDING)
+  progress    Int       @default(0)
+  message     String?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model RenderJob {
+  id          String    @id @default(uuid())
+  clipId      String    @unique
+  status      JobStatus @default(PENDING)
+  progress    Int       @default(0)
+  outputPath  String?
+  settings    Json?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
+  @@index([clipId])
+  @@index([status])
+}
+
+model AIProvider {
+  id        String          @id @default(uuid())
+  userId    String
+  name      String
+  type      AIProviderType
+  model     String?
+  apiKey    String?
+  baseUrl   String?
+  config    Json?
+  isDefault Boolean         @default(false)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id])
+  projects ProjectSettings[]
+
+  @@index([userId])
+}
+
+model ProjectSettings {
+  id               String        @id @default(uuid())
+  projectId        String        @unique
+  aiProviderId     String?
+  numClips         Int           @default(10)
+  minDuration      Int           @default(20)
+  maxDuration      Int           @default(60)
+  aspectRatio      AspectRatio   @default(PORTRAIT)
+  style            VideoStyle    @default(TIKTOK)
+  targetHooks      Boolean       @default(true)
+  targetFunny      Boolean       @default(true)
+  targetSurprising Boolean       @default(true)
+  targetEducational Boolean      @default(true)
+  targetEmotional  Boolean       @default(true)
+  contextBefore    Float         @default(2)
+  contextAfter     Float         @default(2)
+  scoringWeights   Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  aiProvider AIProvider?  @relation(fields: [aiProviderId], references: [id])
+
+  @@index([projectId])
+}
+
+model CaptionPreset {
+  id               String          @id @default(uuid())
+  name             String
+  font             String          @default("Arial")
+  fontSize         Int             @default(24)
+  position         CaptionPosition @default(BOTTOM)
+  background       CaptionBackground @default(TRANSPARENT)
+  animation        CaptionAnimation @default(NONE)
+  capitalization   Capitalization  @default(NONE)
+  maxCharsPerLine  Int             @default(40)
+  highlightColor   String?
+  userId           String?
+  isDefault        Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
