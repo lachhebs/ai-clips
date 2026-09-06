@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Upload, Film, Scissors, Brain } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const [projectCount, clipCount, recentProjects] = await Promise.all([
     prisma.project.count(),

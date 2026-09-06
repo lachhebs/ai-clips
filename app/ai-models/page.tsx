@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Check, X } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function AIModelsPage() {
   const providers = await prisma.aIProvider.findMany({
     orderBy: { createdAt: "desc" },
