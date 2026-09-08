@@ -1,24 +1,30 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, HardDrive, Cpu } from "lucide-react";
+import { Database, Cloud, Brain, FileText } from "lucide-react";
 
 export default function SettingsPage() {
   const sections = [
     {
       title: "Database",
       icon: Database,
-      description: "PostgreSQL database for storing projects, clips, and metadata",
+      description: "Neon PostgreSQL for storing projects, clips, and metadata",
       status: "Connected",
     },
     {
       title: "Storage",
-      icon: HardDrive,
-      description: "Local file storage for uploaded videos and generated clips",
+      icon: Cloud,
+      description: "Vercel Blob for video file storage",
       status: "Active",
     },
     {
-      title: "Processing",
-      icon: Cpu,
-      description: "FFmpeg for video processing, Whisper for transcription",
+      title: "Transcription",
+      icon: FileText,
+      description: "OpenAI Whisper API for audio transcription",
+      status: "Ready",
+    },
+    {
+      title: "AI Analysis",
+      icon: Brain,
+      description: "Qwen AI for clip discovery and scoring",
       status: "Ready",
     },
   ];
@@ -32,7 +38,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {sections.map((section) => (
           <Card key={section.title}>
             <CardHeader>
@@ -55,34 +61,23 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-white">Environment Variables</CardTitle>
+          <CardTitle className="text-white">Required Environment Variables</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3 text-sm">
-            <div className="flex justify-between items-center py-2 border-b border-zinc-800">
-              <span className="text-zinc-400">DATABASE_URL</span>
-              <code className="text-zinc-300 bg-zinc-800 px-2 py-1 rounded">
-                postgresql://***@localhost:5432/ai_clips
-              </code>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-zinc-800">
-              <span className="text-zinc-400">REDIS_URL</span>
-              <code className="text-zinc-300 bg-zinc-800 px-2 py-1 rounded">
-                redis://localhost:6379
-              </code>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-zinc-800">
-              <span className="text-zinc-400">WHISPER_MODEL</span>
-              <code className="text-zinc-300 bg-zinc-800 px-2 py-1 rounded">
-                small
-              </code>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-zinc-400">STORAGE_PATH</span>
-              <code className="text-zinc-300 bg-zinc-800 px-2 py-1 rounded">
-                ./storage
-              </code>
-            </div>
+            {[
+              { name: "DATABASE_URL", desc: "Neon PostgreSQL connection string" },
+              { name: "BLOB_READ_WRITE_TOKEN", desc: "Vercel Blob storage token" },
+              { name: "OPENAI_API_KEY", desc: "OpenAI API key for Whisper transcription" },
+              { name: "QWEN_API_KEY", desc: "DashScope API key for Qwen AI" },
+            ].map((env) => (
+              <div key={env.name} className="flex justify-between items-center py-2 border-b border-zinc-800 last:border-0">
+                <div>
+                  <code className="text-zinc-300 bg-zinc-800 px-2 py-1 rounded">{env.name}</code>
+                  <p className="text-xs text-zinc-500 mt-1">{env.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
