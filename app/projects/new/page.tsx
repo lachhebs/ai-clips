@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, ArrowLeft, FileVideo, X } from "lucide-react";
 import Link from "next/link";
+import { upload } from "@vercel/blob/client";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -21,7 +22,6 @@ export default function NewProjectPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
-      // Validate file size (max 500MB)
       if (selected.size > 500 * 1024 * 1024) {
         setError("File size must be less than 500MB");
         return;
@@ -59,19 +59,16 @@ export default function NewProjectPage() {
       // Upload video if selected
       if (file) {
         setUploading(true);
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("projectId", project.id);
+        setUploadProgress(0);
 
-        const uploadRes = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
+        await upload(file.name, file, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+          clientPayload: project.id,
+          onUploadProgress: ({ percentage }) => {
+            setUploadProgress(Math.round(percentage));
+          },
         });
-
-        if (!uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          throw new Error(uploadData.error || "Failed to upload video");
-        }
 
         // Start processing
         await fetch(`/api/projects/${project.id}/process`, {
@@ -190,6 +187,17 @@ export default function NewProjectPage() {
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
+                  {uploading && (
+                    <div className="mt-3">
+                      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-1">{uploadProgress}% uploaded</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -202,7 +210,7 @@ export default function NewProjectPage() {
                 {loading || uploading ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    {uploading ? "Uploading..." : "Creating..."}
+                    {uploading ? `Uploading ${uploadProgress}%` : "Creating..."}
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
