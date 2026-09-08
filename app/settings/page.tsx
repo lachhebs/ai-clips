@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Database, HardDrive, Cpu } from "lucide-react";
+import { Database, HardDrive, Cpu } from "lucide-react";
 
 export default function SettingsPage() {
   const sections = [

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 interface Toast {
   id: string;
@@ -42,12 +42,12 @@ export function toast({
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>(globalToasts);
 
-  useState(() => {
+  useEffect(() => {
     globalListeners.push(setToasts);
     return () => {
       globalListeners = globalListeners.filter((l) => l !== setToasts);
     };
-  });
+  }, []);
 
   const dismiss = useCallback((id: string) => {
     globalToasts = globalToasts.filter((t) => t.id !== id);
