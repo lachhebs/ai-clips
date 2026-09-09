@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, ArrowLeft, FileVideo, X } from "lucide-react";
 import Link from "next/link";
+import { uploadVideoFromBrowser } from "@/lib/storage/supabase-client";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function NewProjectPage() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -54,22 +56,12 @@ export default function NewProjectPage() {
 
       const project = await res.json();
 
-      // Upload video if selected
+      // Upload video directly to Supabase from browser
       if (file) {
         setUploading(true);
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("projectId", project.id);
-
-        const uploadRes = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          throw new Error(uploadData.error || "Failed to upload video");
-        }
+        setProgress(10);
+        await uploadVideoFromBrowser(file, project.id);
+        setProgress(100);
 
         // Start processing
         await fetch(`/api/projects/${project.id}/process`, {
@@ -175,10 +167,25 @@ export default function NewProjectPage() {
                       <p className="text-white truncate">{file.name}</p>
                       <p className="text-sm text-zinc-400">{formatFileSize(file.size)}</p>
                     </div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => setFile(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
+                    {!uploading && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setFile(null)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
+                  {uploading && (
+                    <div className="mt-3">
+                      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {progress < 100 ? "Uploading to storage..." : "Upload complete!"}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

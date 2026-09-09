@@ -68,7 +68,8 @@ export default function SettingsPage() {
             {[
               { name: "DATABASE_URL", desc: "Neon PostgreSQL connection string" },
               { name: "NEXT_PUBLIC_SUPABASE_URL", desc: "Supabase project URL" },
-              { name: "SUPABASE_SERVICE_ROLE_KEY", desc: "Supabase service role key for storage" },
+              { name: "SUPABASE_SERVICE_ROLE_KEY", desc: "Supabase service role key for server-side storage" },
+              { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", desc: "Supabase anon key for client-side uploads" },
               { name: "OPENAI_API_KEY", desc: "OpenAI API key for Whisper transcription" },
               { name: "QWEN_API_KEY", desc: "DashScope API key for Qwen AI" },
             ].map((env) => (
