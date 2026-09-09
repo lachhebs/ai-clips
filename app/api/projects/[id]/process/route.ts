@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { transcribeWithOpenAI } from "@/lib/transcription/openai-whisper";
 import { QwenAIProvider } from "@/lib/ai/qwen";
 
 export async function POST(
@@ -12,7 +11,6 @@ export async function POST(
 
     const project = await prisma.project.findUnique({
       where: { id },
-      include: { transcript: true },
     });
 
     if (!project) {
@@ -36,9 +34,9 @@ export async function POST(
     const job = await prisma.job.create({
       data: {
         projectId: id,
-        type: "TRANSCRIBE",
+        type: "AI_ANALYSIS",
         status: "ACTIVE",
-        message: "Starting transcription...",
+        message: "Starting AI analysis...",
       },
     });
 
@@ -54,26 +52,36 @@ export async function POST(
 
 async function processVideo(projectId: string, videoUrl: string, jobId: string) {
   try {
-    // Step 1: Transcribe
+    const ai = new QwenAIProvider();
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+
+    // Step 1: Analyze video directly
     await prisma.job.update({
       where: { id: jobId },
-      data: { message: "Transcribing audio with Whisper..." },
+      data: { message: "Analyzing video with AI..." },
     });
 
-    const transcription = await transcribeWithOpenAI(videoUrl);
+    const analysis = await ai.analyzeVideo({
+      videoUrl,
+      metadata: {
+        duration: project?.duration || 0,
+        resolution: project?.resolution || undefined,
+        title: project?.name || undefined,
+      },
+    });
 
-    // Save transcript
+    // Save a summary transcript entry for reference
     await prisma.transcript.create({
       data: {
         projectId,
-        language: transcription.language,
-        fullText: transcription.text,
+        language: "n/a",
+        fullText: analysis.summary,
         segments: {
-          create: transcription.segments.map((seg) => ({
-            text: seg.text,
-            start: seg.start,
-            end: seg.end,
-            confidence: seg.confidence,
+          create: analysis.keyMoments.map((m) => ({
+            text: m.description,
+            start: m.time,
+            end: m.time + 5,
+            confidence: m.importance / 10,
           })),
         },
       },
@@ -81,31 +89,12 @@ async function processVideo(projectId: string, videoUrl: string, jobId: string) 
 
     await prisma.job.update({
       where: { id: jobId },
-      data: { message: "Analyzing content with AI...", progress: 33 },
+      data: { message: "Finding best clips...", progress: 33 },
     });
 
-    // Step 2: AI Analysis
-    const ai = new QwenAIProvider();
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
-
-    const analysis = await ai.analyzeVideo({
-      transcript: transcription.text,
-      segments: transcription.segments,
-      metadata: {
-        duration: project?.duration || 0,
-        resolution: project?.resolution || undefined,
-      },
-    });
-
-    await prisma.job.update({
-      where: { id: jobId },
-      data: { message: "Finding best clips...", progress: 66 },
-    });
-
-    // Step 3: Find clips
+    // Step 2: Find clips
     const clipCandidates = await ai.findClips({
-      transcript: transcription.text,
-      segments: transcription.segments,
+      videoUrl,
       analysis,
       numClips: 10,
       minDuration: 20,
@@ -113,7 +102,12 @@ async function processVideo(projectId: string, videoUrl: string, jobId: string) 
       style: "TikTok",
     });
 
-    // Save clips
+    await prisma.job.update({
+      where: { id: jobId },
+      data: { message: "Scoring clips...", progress: 66 },
+    });
+
+    // Step 3: Save and score clips
     for (const candidate of clipCandidates) {
       const clip = await prisma.clip.create({
         data: {
@@ -129,12 +123,10 @@ async function processVideo(projectId: string, videoUrl: string, jobId: string) 
         },
       });
 
-      // Score each clip
       try {
         const score = await ai.scoreClips({
           candidate,
-          transcript: transcription.text,
-          context: analysis.summary,
+          analysis,
         });
 
         await prisma.clipScore.create({

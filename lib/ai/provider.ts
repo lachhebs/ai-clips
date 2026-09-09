@@ -5,12 +5,10 @@ export interface AIProvider {
 }
 
 export interface VideoAnalysisInput {
-  transcript: string;
-  segments: Array<{ text: string; start: number; end: number; speaker?: string }>;
+  videoUrl: string;
   metadata: {
     duration: number;
     resolution?: string;
-    fps?: number;
     title?: string;
   };
 }
@@ -27,8 +25,7 @@ export interface VideoAnalysisResult {
 }
 
 export interface ClipDiscoveryInput {
-  transcript: string;
-  segments: Array<{ text: string; start: number; end: number }>;
+  videoUrl: string;
   analysis: VideoAnalysisResult;
   numClips: number;
   minDuration: number;
@@ -47,8 +44,7 @@ export interface ClipCandidate {
 
 export interface ClipScoringInput {
   candidate: ClipCandidate;
-  transcript: string;
-  context: string;
+  analysis: VideoAnalysisResult;
 }
 
 export interface ClipScoreResult {

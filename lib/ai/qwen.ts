@@ -15,11 +15,11 @@ export class QwenAIProvider implements AIProvider {
 
   constructor() {
     this.apiKey = process.env.QWEN_API_KEY || '';
-    this.model = process.env.QWEN_MODEL || 'qwen-plus';
+    this.model = process.env.QWEN_MODEL || 'qwen-vl-max';
     this.baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
   }
 
-  private async chat(messages: Array<{ role: string; content: string }>): Promise<string> {
+  private async chat(messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>): Promise<string> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -30,7 +30,7 @@ export class QwenAIProvider implements AIProvider {
         model: this.model,
         messages,
         temperature: 0.7,
-        response_format: { type: 'json_object' },
+        max_tokens: 4096,
       }),
     });
 
@@ -43,19 +43,37 @@ export class QwenAIProvider implements AIProvider {
     return data.choices[0]?.message?.content || '';
   }
 
+  private parseJsonResponse(text: string): Record<string, unknown> {
+    // Try to extract JSON from the response, handling markdown code blocks
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[1].trim());
+    }
+    return JSON.parse(text);
+  }
+
   async analyzeVideo(input: VideoAnalysisInput): Promise<VideoAnalysisResult> {
-    const transcriptPreview = input.transcript.slice(0, 8000);
-
-    const prompt = `Analyze this video transcript and provide insights.
-
-TRANSCRIPT:
-${transcriptPreview}
+    const result = await this.chat([
+      {
+        role: 'system',
+        content: 'You are a video content analyzer. You MUST respond with valid JSON only, no markdown formatting.'
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'video_url',
+            video_url: { url: input.videoUrl },
+          },
+          {
+            type: 'text',
+            text: `Analyze this video and provide insights.
 
 VIDEO METADATA:
 - Duration: ${Math.round(input.metadata.duration)}s
-- Resolution: ${input.metadata.resolution || 'unknown'}
+- Title: ${input.metadata.title || 'Untitled'}
 
-Respond in JSON format:
+Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
 {
   "summary": "Brief summary of the video content",
   "topics": ["topic1", "topic2", "topic3"],
@@ -63,25 +81,31 @@ Respond in JSON format:
   "keyMoments": [
     {"time": 120, "description": "What happens at this moment", "importance": 8}
   ]
-}`;
-
-    const result = await this.chat([
-      { role: 'system', content: 'You are a video content analyzer. Respond only in valid JSON.' },
-      { role: 'user', content: prompt },
+}`,
+          },
+        ],
+      },
     ]);
 
-    return JSON.parse(result);
+    return this.parseJsonResponse(result) as unknown as VideoAnalysisResult;
   }
 
   async findClips(input: ClipDiscoveryInput): Promise<ClipCandidate[]> {
-    const transcriptWithTimes = input.segments
-      .map(s => `[${s.start.toFixed(1)}s - ${s.end.toFixed(1)}s] ${s.text}`)
-      .join('\n');
-
-    const prompt = `Find the best ${input.numClips} viral short-form clips from this video.
-
-TRANSCRIPT WITH TIMESTAMPS:
-${transcriptWithTimes.slice(0, 10000)}
+    const result = await this.chat([
+      {
+        role: 'system',
+        content: 'You are an expert video editor who finds viral clips. You MUST respond with valid JSON only, no markdown formatting.'
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'video_url',
+            video_url: { url: input.videoUrl },
+          },
+          {
+            type: 'text',
+            text: `Find the best ${input.numClips} viral short-form clips from this video.
 
 ANALYSIS:
 - Topics: ${input.analysis.topics.join(', ')}
@@ -90,47 +114,62 @@ ANALYSIS:
 
 CONSTRAINTS:
 - Each clip must be ${input.minDuration}-${input.maxDuration} seconds
-- Clips must start and end at natural speech boundaries
+- Clips must start and end at natural boundaries (scene changes, pauses, speech breaks)
 - Prioritize: strong hooks, emotional moments, surprising revelations, complete stories
 - Style: ${input.style || 'TikTok/Instagram Reels'}
 
-Respond in JSON format:
+Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
 {
   "clips": [
     {
       "startTime": 45.2,
       "endTime": 92.8,
       "title": "Catchy title for the clip",
-      "hook": "The opening line that grabs attention",
+      "hook": "The opening line or moment that grabs attention",
       "description": "Why this clip is compelling",
       "reasoning": "Why you selected these specific boundaries"
     }
   ]
-}`;
-
-    const result = await this.chat([
-      { role: 'system', content: 'You are an expert video editor who finds viral clips. Respond only in valid JSON.' },
-      { role: 'user', content: prompt },
+}`,
+          },
+        ],
+      },
     ]);
 
-    const parsed = JSON.parse(result);
-    return parsed.clips || [];
+    const parsed = this.parseJsonResponse(result) as Record<string, unknown>;
+    return (parsed.clips as ClipCandidate[]) || [];
   }
 
   async scoreClips(input: ClipScoringInput): Promise<ClipScoreResult> {
-    const prompt = `Score this video clip on multiple dimensions (0-10 scale).
+    const duration = input.candidate.endTime - input.candidate.startTime;
+
+    const result = await this.chat([
+      {
+        role: 'system',
+        content: 'You are a viral content scoring expert. You MUST respond with valid JSON only, no markdown formatting.'
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'video_url',
+            video_url: { url: '' },
+          },
+          {
+            type: 'text',
+            text: `Score this video clip concept on multiple dimensions (0-10 scale).
 
 CLIP:
 - Title: ${input.candidate.title}
 - Hook: ${input.candidate.hook}
 - Description: ${input.candidate.description}
-- Duration: ${(input.candidate.endTime - input.candidate.startTime).toFixed(1)}s
-
-TRANSCRIPT:
-${input.transcript.slice(0, 3000)}
+- Duration: ${duration.toFixed(1)}s
+- Time range: ${input.candidate.startTime}s - ${input.candidate.endTime}s
 
 CONTEXT:
-${input.context.slice(0, 2000)}
+- Video topics: ${input.analysis.topics.join(', ')}
+- Video mood: ${input.analysis.mood}
+- Summary: ${input.analysis.summary}
 
 Score each dimension 0-10:
 - hook: How strong is the opening hook (attention in first 3 seconds)
@@ -143,7 +182,7 @@ Score each dimension 0-10:
 - visual: Visual appeal and engagement
 - virality: Likelihood to be shared
 
-Respond in JSON format:
+Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
 {
   "hook": 8.5,
   "value": 7.0,
@@ -156,13 +195,12 @@ Respond in JSON format:
   "virality": 8.5,
   "overall": 7.7,
   "reasoning": "Brief explanation of scores"
-}`;
-
-    const result = await this.chat([
-      { role: 'system', content: 'You are a viral content scoring expert. Respond only in valid JSON.' },
-      { role: 'user', content: prompt },
+}`,
+          },
+        ],
+      },
     ]);
 
-    return JSON.parse(result);
+    return this.parseJsonResponse(result) as unknown as ClipScoreResult;
   }
 }

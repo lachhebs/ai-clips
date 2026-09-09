@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, Cloud, Brain, FileText } from "lucide-react";
+import { Database, Cloud, Brain } from "lucide-react";
 
 export default function SettingsPage() {
   const sections = [
@@ -15,13 +15,7 @@ export default function SettingsPage() {
       description: "Supabase Storage for video files",
       status: "Active",
     },
-    {
-      title: "Transcription",
-      icon: FileText,
-      description: "OpenAI Whisper API for audio transcription",
-      status: "Ready",
-    },
-    {
+{
       title: "AI Analysis",
       icon: Brain,
       description: "Qwen AI for clip discovery and scoring",
@@ -70,8 +64,7 @@ export default function SettingsPage() {
               { name: "NEXT_PUBLIC_SUPABASE_URL", desc: "Supabase project URL" },
               { name: "SUPABASE_SERVICE_ROLE_KEY", desc: "Supabase service role key for server-side storage" },
               { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", desc: "Supabase anon key for client-side uploads" },
-              { name: "OPENAI_API_KEY", desc: "OpenAI API key for Whisper transcription" },
-              { name: "QWEN_API_KEY", desc: "DashScope API key for Qwen AI" },
+{ name: "QWEN_API_KEY", desc: "DashScope API key for Qwen AI" },
             ].map((env) => (
               <div key={env.name} className="flex justify-between items-center py-2 border-b border-zinc-800 last:border-0">
                 <div>
