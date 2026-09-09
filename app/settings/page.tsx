@@ -12,7 +12,7 @@ export default function SettingsPage() {
     {
       title: "Storage",
       icon: Cloud,
-      description: "Vercel Blob for video file storage",
+      description: "Supabase Storage for video files",
       status: "Active",
     },
     {
@@ -67,7 +67,8 @@ export default function SettingsPage() {
           <div className="space-y-3 text-sm">
             {[
               { name: "DATABASE_URL", desc: "Neon PostgreSQL connection string" },
-              { name: "BLOB_READ_WRITE_TOKEN", desc: "Vercel Blob storage token" },
+              { name: "NEXT_PUBLIC_SUPABASE_URL", desc: "Supabase project URL" },
+              { name: "SUPABASE_SERVICE_ROLE_KEY", desc: "Supabase service role key for storage" },
               { name: "OPENAI_API_KEY", desc: "OpenAI API key for Whisper transcription" },
               { name: "QWEN_API_KEY", desc: "DashScope API key for Qwen AI" },
             ].map((env) => (

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, FileVideo, Upload, X } from "lucide-react";
 import Link from "next/link";
-import { upload } from "@vercel/blob/client";
 
 export default function UploadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -14,7 +13,6 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState("");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,17 +31,17 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
     if (!file) return;
     setUploading(true);
     setError("");
-    setUploadProgress(0);
 
     try {
-      await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-        clientPayload: id,
-        onUploadProgress: ({ percentage }) => {
-          setUploadProgress(Math.round(percentage));
-        },
-      });
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("projectId", id);
+
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Upload failed");
+      }
 
       // Start processing
       await fetch(`/api/projects/${id}/process`, { method: "POST" });
@@ -116,17 +114,6 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              {uploading && (
-                <div className="mt-3">
-                  <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-zinc-400 mt-1">{uploadProgress}% uploaded</p>
-                </div>
-              )}
             </div>
           )}
 
@@ -138,7 +125,7 @@ export default function UploadPage({ params }: { params: Promise<{ id: string }>
               {uploading ? (
                 <span className="flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Uploading {uploadProgress}%
+                  Uploading...
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
